@@ -1,0 +1,9 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { buildUrl, callApi } from "./api-client.js";
+
+// 以下工具由 rest-api-to-mcp 生成器根据 OpenAPI / 端点清单自动生成。
+// 每个 MCP 工具 = 一个 REST 操作的封装：入参 schema 由 zod 描述，handler 负责拼 URL + 调 fetch。
+export function registerTools(server: McpServer): void {
+{{TOOL_REGISTRATIONS}}
+}

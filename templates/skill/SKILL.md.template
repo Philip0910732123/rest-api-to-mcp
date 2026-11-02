@@ -1,0 +1,46 @@
+---
+name: {{SKILL_NAME}}
+description: Single-purpose skill that wraps {{SERVER_NAME}} ({{BASE_URL}}) as AI-callable commands via its HTTP API. Use it whenever the user needs to query, fetch, or call {{SERVER_NAME}} through its HTTP API.
+---
+
+# Skill: {{SERVER_NAME}}
+
+This skill is a thin, **zero-build, zero-dependency** wrapper around {{SERVER_NAME}}. It shells out to `scripts/query_api.py` (pure Python standard library), which performs the real HTTP call and returns a normalized JSON envelope. Prefer this over hand-writing `curl`: the script handles the base URL, auth, pagination hints, and error normalization for you.
+
+## Files in this skill
+1. Query helper: `scripts/query_api.py`
+2. API quick reference: `references/api_quickref.md`
+
+## Execution protocol
+1. Look up the target endpoint in `references/api_quickref.md` and call it with `--endpoint` (preferred, unambiguous).
+2. Only use `--prompt` as a fallback to let the script pick a default endpoint from keywords.
+3. Set required credentials via the `{{AUTH_ENV}}` environment variable before running (skip this step if the API needs no auth).
+4. Save the raw response with `--out <file>` for reproducibility and downstream parsing.
+5. Return the normalized JSON envelope (`status` / `source` / `request` / `count` / `data` / `errors` / `next_page`).
+
+## Output contract
+The helper returns a JSON object with:
+1. `status`: `ok` or `error`
+2. `source`: official data source name
+3. `request`: method, URL, params, and timeout
+4. `count`: best-effort row/item count
+5. `data`: JSON/text payload from the API
+6. `errors`: non-empty when request or parsing fails
+7. `next_page`: best-effort pagination hint
+
+## CLI examples
+1. Direct endpoint mode (preferred):
+   - `python scripts/query_api.py --endpoint "{{EXAMPLE_ENDPOINT}}" --params '{}'`
+2. Prompt mode (best-effort):
+   - `python scripts/query_api.py --prompt "..."`
+3. Persist output:
+   - `python scripts/query_api.py --endpoint "{{EXAMPLE_ENDPOINT}}" --out notebook/result.json`
+
+> ⚠️ **端点不要带前导斜杠**（如 `--endpoint pets` 而非 `--endpoint /pets`）。脚本会自动拼到 base URL 后面；带 `/` 在 Git Bash 下会被当成文件系统路径而改写，导致请求打错地址。
+
+## Guardrails
+1. Use only official API endpoints listed in `references/api_quickref.md`.
+2. Preserve raw response payloads before post-processing.
+3. Report authentication and rate-limit constraints explicitly.
+4. If prompt mapping is ambiguous, require an explicit `--endpoint`.
+5. Never commit secrets; the key is read from the `{{AUTH_ENV}}` environment variable at runtime, never hard-coded.

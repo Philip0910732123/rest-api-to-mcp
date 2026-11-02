@@ -1,0 +1,30 @@
+{
+  "name": "{{PKG_NAME}}",
+  "version": "{{VERSION}}",
+  "description": "{{SPEC_DESC}}",
+  "type": "module",
+  "bin": {
+    "{{PKG_NAME}}": "build/index.js"
+  },
+  "main": "build/index.js",
+  "files": [
+    "build"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "node --watch build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "license": "MIT"
+}

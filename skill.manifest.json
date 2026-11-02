@@ -1,0 +1,28 @@
+{
+  "name": "rest-api-to-mcp",
+  "version": "1.0.0",
+  "description": "把任意 REST API（OpenAPI 3.x 或手动端点清单）生成一个「可直接发布到 GitHub」的 MCP server 仓库（stdio，Node + TypeScript）或一个 WorkBuddy skill 包（Python 零依赖）。",
+  "author": "hupan",
+  "alias": "rest-api-to-mcp",
+  "salt": "",
+  "exclude_paths": [
+    ".git",
+    "node_modules",
+    "templates",
+    "out",
+    "*.log",
+    "*.tmp",
+    "*.bak"
+  ],
+  "runtime": {
+    "node_version": ">=18",
+    "dependencies": [],
+    "isolated_env": false
+  },
+  "credentials": [],
+  "mcp_dependencies": [],
+  "tests": [],
+  "outputs": [
+    "<--out 指定目录> 生成的 MCP server 仓库 / skill 包"
+  ]
+}

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP 功能评估集模板（借鉴 cn-mcp-builder 的方法论，供 rest-api-to-mcp 生成的产物使用）
+
+  用法：
+    1. 把下面的 <qa_pair> 替换成你生成的具体 MCP 的 10 个评估问题。
+    2. 每个 <question> 必须满足：独立 / 只读 / 非破坏 / 幂等 / 复杂多跳 / 稳定 / 可验证 / 真实。
+    3. <answer> 写「单一、可字符串比对」的正确答案（名称 / 数字 / 布尔 / 日期 / ID），不要写列表或长文本。
+    4. 保存为 evaluation.xml，用 cn-mcp-builder 的 evaluation.py 跑（见 SKILL.md「功能评估」章节）。
+
+  自检清单（每个问题都要过）：
+    □ 只用 GET 类工具就能答，绝不要求写操作
+    □ 需要多次工具调用 / 翻页 / 跨数据关联（不能关键词直搜）
+    □ 答案基于已闭合的历史数据，不会随时间变化（不写「当前有多少条」）
+    □ 答案是一个定值，能用字符串直接比对
+    □ 贴近人类用这个 API 真实会做的检索任务
+-->
+<evaluation>
+  <!-- 示例 1：多跳 + 历史数据（好） -->
+  <qa_pair>
+    <question>查找在 2023 年第一季度创建、且累计被引用次数最高的那条记录，它的标题是什么？</question>
+    <answer>示例标题文本</answer>
+  </qa_pair>
+
+  <!-- 示例 2：需要翻页聚合（好） -->
+  <qa_pair>
+    <question>在 2024 年标记为“已完成”的所有条目里，哪一个的负责人处理的数量最多？给出该负责人的用户名。</question>
+    <answer>负责人用户名</answer>
+  </qa_pair>
+
+  <!-- 示例 3：理解上下文而非关键词（好） -->
+  <qa_pair>
+    <question>找到那个用于“改善新用户引导”且于 2023 年底结束的项目，其负责人当时的职位头衔是什么？</question>
+    <answer>产品经理</answer>
+  </qa_pair>
+
+  <!-- 示例 4：跨数据类型综合（好） -->
+  <qa_pair>
+    <question>找出在 2023 年 Q4 从入门版升级到企业版、且年度合同金额最高的那个账户，它属于哪个行业？</question>
+    <answer>医疗健康</answer>
+  </qa_pair>
+
+  <!-- 示例 5：单一可验证数值（好） -->
+  <qa_pair>
+    <question>在 2024 年 1 月报告、优先级为 critical、并在 48 小时内被解决的缺陷中，解决比例最高的处理人处理了几条？</question>
+    <answer>7</answer>
+  </qa_pair>
+
+  <!-- ↓↓↓ 下面 5 个请替换为你的真实 API 场景；以下为占位，不要直接提交 ↓↓↓ -->
+  <qa_pair>
+    <question>[替换为你的第 6 个评估问题：独立/只读/复杂多跳/稳定/可验证]</question>
+    <answer>[正确答案]</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>[替换为你的第 7 个评估问题]</question>
+    <answer>[正确答案]</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>[替换为你的第 8 个评估问题]</question>
+    <answer>[正确答案]</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>[替换为你的第 9 个评估问题]</question>
+    <answer>[正确答案]</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>[替换为你的第 10 个评估问题]</question>
+    <answer>[正确答案]</answer>
+  </qa_pair>
+</evaluation>

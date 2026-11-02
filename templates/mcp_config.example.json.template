@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "{{PKG_NAME}}": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["{{OUT_ABS}}/build/index.js"],
+      "env": {
+        "{{AUTH_ENV}}": "YOUR_KEY_HERE",
+        "API_BASE_URL": "{{BASE_URL}}"
+      }
+    }
+  }
+}

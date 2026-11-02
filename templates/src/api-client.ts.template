@@ -1,0 +1,54 @@
+// 自动生成的 REST 客户端层：负责 baseUrl、鉴权头、URL 拼装与 fetch 调用。
+// 你无需修改此处即可使用；如需自定义（重试、超时、分页、长任务轮询），在此扩展。
+
+const BASE_URL = (process.env.API_BASE_URL || "{{BASE_URL}}").replace(/\/$/, "");
+
+export function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+{{AUTH_HEADER_LINES}}
+  return h;
+}
+
+export function buildUrl(
+  pathTpl: string,
+  args: Record<string, any>,
+  queryKeys: string[] = []
+): string {
+  let path = pathTpl.replace(/\{([^}]+)\}/g, (_m, k) => encodeURIComponent(String(args[k] ?? "")));
+  const q = new URLSearchParams();
+{{AUTH_QUERY_LINE}}
+  for (const k of queryKeys) {
+    const v = args[k];
+    if (v === undefined || v === null || v === "") continue;
+    // 数组参数（z.array(z.string())）用逗号拼接成 URL 列表形式
+    q.set(k, Array.isArray(v) ? v.join(",") : String(v));
+  }
+  const qs = q.toString();
+  return BASE_URL + path + (qs ? "?" + qs : "");
+}
+
+export async function callApi(
+  method: string,
+  url: string,
+  args: Record<string, any>,
+  hasBody = false
+): Promise<string> {
+  const headers: Record<string, string> = { ...authHeaders() };
+  const init: RequestInit = { method };
+  if (hasBody && args.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    init.body = typeof args.body === "string" ? args.body : JSON.stringify(args.body);
+  }
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+  if (!res.ok) {
+    return "HTTP " + res.status + ": " + (typeof parsed === "string" ? parsed : JSON.stringify(parsed));
+  }
+  return typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
+}

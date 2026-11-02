@@ -1,0 +1,84 @@
+# {{PKG_NAME}}
+
+> {{SPEC_DESC}}
+
+一个由 **[rest-api-to-mcp](https://github.com/)** 生成的 MCP (Model Context Protocol) server，
+把 {{SERVER_NAME}} 的 REST API 封装成 AI 助手可直接调用的工具。stdio 传输，开箱即用。
+
+## 特性
+
+- 🔌 **stdio MCP server**：直接被 WorkBuddy / Claude Desktop / 任何 MCP 客户端加载
+- 🛠️ **{{TOOL_COUNT}} 个自动生成工具**：每个 REST 操作映射为一个 MCP 工具（zod 强类型入参）
+- 🔐 **环境变量鉴权**：密钥走 `env`，绝不写死在代码里
+- 🧯 **副作用提示**：非 GET（POST/PUT/PATCH/DELETE）工具在描述中标注「会写入/修改远端数据」，提醒调用前确认
+- 🧪 **质量门禁**：可用 `rest-api-to-mcp --audit` 对产物做合规/安全/可用性三栏审计
+- 🐳 **Docker 就绪**：仓库内含 `Dockerfile`
+
+## 安装（本地源码包，推荐）
+
+本仓库是**本地 Node 源码包**，先构建再运行（这也是 WorkBuddy 接入的默认形态）：
+
+```bash
+npm install
+npm run build
+node build/index.js
+```
+
+> 若已 `npm publish` 发布到 npm，可改用 `npx -y {{PKG_NAME}}` 免本地构建。未发布前**不要**用 npx 形式。
+
+## 配置（鉴权）
+
+复制 `.env.example` 为 `.env` 并填写；或直接通过环境变量传入：
+
+```bash
+export API_BASE_URL="{{BASE_URL}}"
+export {{AUTH_ENV}}="YOUR_KEY_HERE"
+```
+
+> 若 {{SERVER_NAME}} 无需鉴权，可省略 `{{AUTH_ENV}}`。密钥仅经环境变量注入，**切勿提交真实密钥**（`.env` 已在 `.gitignore`）。
+
+## 接入 MCP 客户端
+
+将 `mcp_config.example.json` 的内容并入你的 `mcp.json`（或 Claude 的 `claude_desktop_config.json`）：
+
+```json
+{
+  "mcpServers": {
+    "{{PKG_NAME}}": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["<本仓库绝对路径>/build/index.js"],
+      "env": {
+        "{{AUTH_ENV}}": "YOUR_KEY_HERE",
+        "API_BASE_URL": "{{BASE_URL}}"
+      }
+    }
+  }
+}
+```
+
+> ⚠️ 改完 `mcp.json` 后需**完全退出重启客户端**，再到连接器页「信任」该 MCP 才会生效。
+
+## 安全与质量
+
+- **密钥管理**：所有凭证经 `env` 注入（`stdio` server 的标准做法），代码内仅读 `process.env.*`，无硬编码。
+- **错误格式**：所有 handler 错误统一返回 MCP `isError: true` 信封，不向调用方泄露内部堆栈。
+- **写操作护栏**：非 GET 工具已在描述中标「副作用操作」提示，使用前请确认参数与权限。
+- **类型约束**：入参按 OpenAPI `schema.type` 保真映射 zod（`integer/number→number`、`boolean→boolean`、`array→array`、`enum→enum`）；`body` 用 `z.any()` 透传 JSON，严格 schema 可后续接入 `json-schema-to-zod`。
+- **扩展点**：分页、重试、超时、长任务轮询、限流/审计日志请在 `src/api-client.ts` 的 `callApi` 中统一补充。
+
+## 工具列表
+
+{{TOOLS_TABLE}}
+
+## 开发
+
+```bash
+npm install
+npm run build
+# 本地调试：用任意 MCP 客户端指向 build/index.js
+```
+
+## License
+
+MIT © {{YEAR}} {{AUTHOR}}
