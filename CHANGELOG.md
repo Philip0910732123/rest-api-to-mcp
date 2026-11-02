@@ -26,6 +26,7 @@
 - **新增 `examples/`**：`petstore.json`（精简 OpenAPI 3.0，刻意覆盖 enum / integer / path 参数 / JSON body / DELETE）+ `README.md` 两分钟跑通指南。此前新用户 clone 下来没有任何可直接运行的样例。
 - **`--audit` 有 FAIL 时退出码改为非零**：此前无论多少 FAIL 都返回 0，脚本/CI 无法据以拦截，质量门禁形同虚设。WARN 仍不影响退出码。
 - **新增 GitHub Actions CI**（`.github/workflows/ci.yml`，3 个 job / 20 步）：`mcp-mode` 在 node 20+22 上跑 `--help` → 生成样例 → 握手 → 断言审计 0 FAIL、工具名分词、注解按 HTTP 方法声明、integer/enum 类型映射不退化；`skill-mode` 校验 Python 包可执行并断言 Git Bash 路径改写能被还原（离线断言，不依赖网络）；`release-check` 校验 SKILL.md/manifest 版本一致、`exclude_paths` 未误排 `templates/`。
+- **移除硬编码的本机绝对路径**：生成器解析 YAML / 探测 Python 解释器时写死了 `C:/Users/<user>/.workbuddy/...` 的路径，公开仓库等于泄露本机用户名，换机也直接失效。改为 `$PYTHON` / `$PYTHON3` 优先 + 各平台常见命令（win32: `python`/`python3`/`py`）。
 
 ## [1.0.0] — 2026-11-02
 

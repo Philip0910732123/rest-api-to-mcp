@@ -119,12 +119,7 @@ function ensureYaml(py) {
 }
 
 function yamlToJson(file) {
-  const candidates = [
-    "python3",
-    "python",
-    "C:/Users/hupan/.workbuddy/binaries/python/envs/default/Scripts/python.exe",
-    "C:/Users/hupan/.workbuddy/binaries/python/versions/3.13.12/python3",
-  ];
+  const candidates = pythonCandidates();
   const code = "import yaml,json,sys;print(json.dumps(yaml.safe_load(open(sys.argv[1]).read())))";
   for (const py of candidates) {
     if (!ensureYaml(py)) continue;
@@ -646,13 +641,17 @@ function writeSkillRepo(data) {
   return outDir;
 }
 
+// 可移植的 Python 解释器候选：优先 $PYTHON / $PYTHON3，其次各平台常见命令。
+// 不要硬编码本机绝对路径——公开仓库里会泄露用户名，换台机器也直接失效。
+function pythonCandidates() {
+  const list = [process.env.PYTHON, process.env.PYTHON3];
+  if (process.platform === "win32") list.push("python", "python3", "py");
+  else list.push("python3", "python");
+  return list.filter(Boolean);
+}
+
 function findPython() {
-  const cands = [
-    "python3",
-    "python",
-    "C:/Users/hupan/.workbuddy/binaries/python/envs/default/Scripts/python.exe",
-  ];
-  for (const py of cands) {
+  for (const py of pythonCandidates()) {
     const r = spawnSync(py, ["--version"], { encoding: "utf8" });
     if (r.status === 0) return py;
   }
