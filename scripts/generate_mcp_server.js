@@ -889,6 +889,8 @@ function runAudit(outDir) {
   if (fails) console.log("  ⛔ 存在 FAIL 项，建议修复后再发布/接入。");
   else if (warns) console.log("  🟡 无 FAIL，但有建议项（WARN），可按需优化。");
   else console.log("  🟢 全面通过，质量门禁绿灯。");
+  // 有 FAIL 时退出码非零，否则 CI / 脚本无法据以拦截（WARN 不影响退出码）
+  if (fails) process.exitCode = 1;
   return { fails, warns };
 }
 

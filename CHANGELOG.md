@@ -24,6 +24,8 @@
 - **修复生成的 skill 脚本在 Windows Git Bash 下 URL 拼错**：Git Bash 会把 `--endpoint /pet/1` 改写成 `C:/Program Files/Git/pet/1`，而 `urljoin` 把 `C:` 当成 scheme，最终请求到 `C:/Users/.../PortableGit/pet/1` 并报 `unknown url type: c`。新增 `demangle_windows_path()` 还原 Git 安装根目录前缀，带不带前导斜杠现在都能正确请求。
 - **修复 `skill.manifest.json` 的 `exclude_paths` 排除了 `templates/`**：生成器运行时必须读取 `templates/`，若技能中心按此清单打包，发布出去的技能将无法生成任何东西。已移除该条目。
 - **新增 `examples/`**：`petstore.json`（精简 OpenAPI 3.0，刻意覆盖 enum / integer / path 参数 / JSON body / DELETE）+ `README.md` 两分钟跑通指南。此前新用户 clone 下来没有任何可直接运行的样例。
+- **`--audit` 有 FAIL 时退出码改为非零**：此前无论多少 FAIL 都返回 0，脚本/CI 无法据以拦截，质量门禁形同虚设。WARN 仍不影响退出码。
+- **新增 GitHub Actions CI**（`.github/workflows/ci.yml`，3 个 job / 20 步）：`mcp-mode` 在 node 20+22 上跑 `--help` → 生成样例 → 握手 → 断言审计 0 FAIL、工具名分词、注解按 HTTP 方法声明、integer/enum 类型映射不退化；`skill-mode` 校验 Python 包可执行并断言 Git Bash 路径改写能被还原（离线断言，不依赖网络）；`release-check` 校验 SKILL.md/manifest 版本一致、`exclude_paths` 未误排 `templates/`。
 
 ## [1.0.0] — 2026-11-02
 

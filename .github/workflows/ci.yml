@@ -1,0 +1,155 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mcp-mode:
+    name: MCP 模式（node ${{ matrix.node }}）
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: CLI 自述（--help 必须可用且退出码为 0）
+        run: |
+          node scripts/generate_mcp_server.js --help | tee /tmp/help.txt
+          grep -q -- "--mode mcp|skill" /tmp/help.txt
+          grep -q -- "--manual" /tmp/help.txt
+          grep -q -- "--audit" /tmp/help.txt
+
+      - name: 从样例规范生成 MCP server（安装 + 编译 + 握手 + 审计）
+        run: |
+          node scripts/generate_mcp_server.js \
+            --spec examples/petstore.json \
+            --pkg petdemo-mcp \
+            --out /tmp/petdemo-mcp \
+            --install --self-check --audit 2>&1 | tee /tmp/gen.log
+
+      - name: 断言审计无 FAIL
+        run: 'grep -q "FAIL: 0" /tmp/gen.log'
+
+      - name: 断言工具名做了驼峰分词
+        # findPetsByStatus 必须生成 find_pets_by_status，而不是 findpetsbystatus
+        run: |
+          for n in find_pets_by_status get_pet_by_id delete_pet add_pet; do
+            grep -q "$n" /tmp/gen.log || { echo "缺少工具名: $n"; exit 1; }
+          done
+          ! grep -q "findpetsbystatus" /tmp/gen.log
+
+      - name: 断言 Tool Annotations 已按 HTTP 方法声明
+        run: |
+          node -e '
+            const s = require("fs").readFileSync("/tmp/petdemo-mcp/build/tools.js", "utf8");
+            const cases = [
+              ["find_pets_by_status", /readOnlyHint"?:\s*true/],
+              ["delete_pet", /destructiveHint"?:\s*true/],
+              ["add_pet", /idempotentHint"?:\s*false/],
+            ];
+            let bad = 0;
+            for (const [name, re] of cases) {
+              const seg = s.split("server.tool(").find((x) => x.startsWith(`"${name}"`));
+              if (!seg || !re.test(seg)) { console.error("注解不符: " + name); bad++; }
+            }
+            if (bad) process.exit(1);
+            console.log("annotations ok");
+          '
+
+      - name: 断言参数类型忠实映射（integer 不得退化成 string）
+        run: |
+          node -e '
+            const s = require("fs").readFileSync("/tmp/petdemo-mcp/build/tools.js", "utf8");
+            if (!s.includes("z.coerce.number()")) { console.error("integer 参数未映射为 z.coerce.number()"); process.exit(1); }
+            if (!/z\.enum\(/.test(s)) { console.error("enum 参数未映射为 z.enum()"); process.exit(1); }
+            console.log("type mapping ok");
+          '
+
+      - name: 仅审计模式可独立运行
+        run: node scripts/generate_mcp_server.js --audit /tmp/petdemo-mcp
+
+  skill-mode:
+    name: Skill 模式（python + 跨平台路径归一化）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 生成 skill 包（Python 零依赖）
+        run: |
+          node scripts/generate_mcp_server.js \
+            --spec examples/petstore.json \
+            --pkg petskill \
+            --out /tmp/petskill \
+            --mode skill --install
+
+      - name: 脚本可执行（--help 冒烟）
+        run: python3 /tmp/petskill/scripts/query_api.py --help
+
+      - name: 断言 Git Bash 路径改写能被还原（Windows 用户的默认场景）
+        run: |
+          cd /tmp/petskill/scripts
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, ".")
+          from query_api import demangle_windows_path as d, normalize_endpoint as n
+
+          # MSYS/Git Bash 把 "/pet/1" 改写成 Windows 路径的两种真实形态
+          assert d("C:/Program Files/Git/pet/1") == "/pet/1", d("C:/Program Files/Git/pet/1")
+          assert d(r"C:\Program Files\Git\pet\1") == "/pet/1", d(r"C:\Program Files\Git\pet\1")
+          assert d("C:/Users/x/PortableGit/pet/1") == "/pet/1", d("C:/Users/x/PortableGit/pet/1")
+          assert d("C:/msys64/mingw64/bin/x") == "/bin/x", d("C:/msys64/mingw64/bin/x")
+
+          # 正常输入不应被误伤
+          assert d("/pet/1") is None
+          assert d("pet/1") is None
+          assert n("/pet/1") == "/pet/1"
+          assert n("pet/1") == "/pet/1"
+          assert n("https://x.test/a") == "https://x.test/a"
+          print("path normalization ok")
+          PY
+
+      - name: 断言端点清单与参考文档齐全
+        run: |
+          test -f /tmp/petskill/SKILL.md
+          test -f /tmp/petskill/references/api_quickref.md
+          test -f /tmp/petskill/LICENSE
+          grep -q "findPetsByStatus\|findByStatus" /tmp/petskill/references/api_quickref.md
+
+  release-check:
+    name: 发版一致性（版本号 / changelog / 打包清单）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: SKILL.md 与 manifest 版本必须一致
+        run: node scripts/publish.js --dry-run
+
+      - name: 断言 templates 未被排除（否则发布出去无法生成任何东西）
+        run: |
+          node -e '
+            const m = require("./skill.manifest.json");
+            const ex = m.exclude_paths || [];
+            if (ex.some((p) => p.replace(/\/$/, "") === "templates")) {
+              console.error("exclude_paths 不能包含 templates/：生成器运行时依赖它");
+              process.exit(1);
+            }
+            console.log("exclude_paths ok");
+          '
