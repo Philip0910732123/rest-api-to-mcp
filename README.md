@@ -17,6 +17,15 @@ WorkBuddy 启动时会自动加载。技能本体只需要 Node（≥18）跑生
 
 ## 快速开始
 
+**先跑内置样例验证环境**（不需要你自己的 API，目标为公开的 petstore3）：
+
+```bash
+node scripts/generate_mcp_server.js --spec examples/petstore.json \
+  --pkg petdemo-mcp --out ./out/petdemo-mcp --install --self-check --audit
+```
+
+预期输出 `✅ 握手成功，服务器返回工具：find_pets_by_status, get_pet_by_id, delete_pet, add_pet` 与 `FAIL: 0`。
+
 ```bash
 # 从 OpenAPI 生成 MCP 仓库，并自动安装 + 编译 + 握手自检 + 质量门禁审计
 node scripts/generate_mcp_server.js \
@@ -31,6 +40,8 @@ node scripts/generate_mcp_server.js --manual endpoints.json --out ./out --instal
 # 想要零构建的 skill 包（Python 脚本）
 node scripts/generate_mcp_server.js --mode skill --spec openapi.json --out ./out/my-api-skill --self-check
 ```
+
+全部参数见 `node scripts/generate_mcp_server.js --help`。
 
 常用参数：
 

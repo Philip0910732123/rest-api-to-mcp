@@ -2,7 +2,7 @@
 name: rest-api-to-mcp
 description: 把任意 REST API（OpenAPI 3.x 规范或手动端点清单）生成一个「可直接发布到 GitHub」的 MCP server 仓库（stdio 传输，Node + TypeScript），或一个 WorkBuddy skill 包（Python 零依赖，对标 ucsc-genome-api 那种「SKILL.md + 脚本」封装）。当用户想把某个 Web API / SaaS 接口封装成 AI 可调用的 MCP 工具或 skill、或要"从 OpenAPI 造一个 MCP/skill"时触发。
 slug: rest-api-to-mcp
-version: 1.0.0
+version: 1.1.0
 author: hupan
 license: MIT
 ---
@@ -29,6 +29,19 @@ license: MIT
 2. **手动端点清单**：`--manual <文件>`。适合没有 OpenAPI、只有接口说明的情况。格式见下文「手动清单格式」。
 
 ## 运行生成器
+
+先看一眼全部参数（不确定时优先跑这个）：
+
+```bash
+node scripts/generate_mcp_server.js --help
+```
+
+想先验证环境是否正常，直接用内置样例（不需要你自己的 API）：
+
+```bash
+node scripts/generate_mcp_server.js --spec examples/petstore.json \
+  --pkg petdemo-mcp --out ./out/petdemo-mcp --install --self-check --audit
+```
 
 ```bash
 # 从本地/远端 OpenAPI 生成 MCP 仓库，并自动安装+编译+握手自检
@@ -111,7 +124,7 @@ my-api-mcp/
 
 每个工具 = `server.tool(name, description, zodShape, annotations, handler)`：handler 负责把 MCP 入参翻译成 HTTP 请求，返回 `content`（文本）+ `structuredContent.data`（解析后的 JSON 对象）；`annotations` 按 HTTP 方法自动声明只读/破坏性/幂等/外部交互。`path` 参数用 `{id}` 占位、`query` 参数自动拼 `?key=val`、`body` 参数序列化为 JSON。
 
-⚠️ **工具命名**：生成的工具名直接取 `operationId`（已 sanitize 成小写蛇形，**不带 `<pkg>_` 前缀**，因为同一 server 只封装一个 API，命名空间交给客户端）。例如 `search_terms`、`get_terms`。在 WorkBuddy 里实际调用名会是 `mcp__<server名>__search_terms`（server 名即 `mcp.json` 里的 key）。参数类型按 OpenAPI `schema.type` 保真映射：`integer/number → z.coerce.number()`、`boolean → z.coerce.boolean()`、`array → z.array(z.string())`、其余 `z.string()`；枚举保持 `z.enum`。
+⚠️ **工具命名**：生成的工具名直接取 `operationId`（先按 camelCase/PascalCase 分好词再转小写蛇形，**不带 `<pkg>_` 前缀**，因为同一 server 只封装一个 API，命名空间交给客户端）。例如 `findPetsByStatus` → `find_pets_by_status`，`search_terms` 保持原样。在 WorkBuddy 里实际调用名会是 `mcp__<server名>__find_pets_by_status`（server 名即 `mcp.json` 里的 key）。参数类型按 OpenAPI `schema.type` 保真映射：`integer/number → z.coerce.number()`、`boolean → z.coerce.boolean()`、`array → z.array(z.string())`、其余 `z.string()`；枚举保持 `z.enum`。
 
 ## 产出结构（Skill 模式，`--mode skill`）
 

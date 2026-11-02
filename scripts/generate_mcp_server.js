@@ -49,7 +49,44 @@ function parseArgs(argv) {
   return out;
 }
 
+const USAGE = `rest-api-to-mcp — 把 REST API 生成 MCP server 或 WorkBuddy skill 包
+
+用法:
+  node generate_mcp_server.js --spec <文件> [--out <目录>] [选项]
+  node generate_mcp_server.js --spec-url <URL> [--out <目录>] [选项]
+  node generate_mcp_server.js --manual <清单.json> [--out <目录>] [选项]
+  node generate_mcp_server.js --audit <已生成的目录>     仅做质量门禁
+
+输入（三选一）:
+  --spec <文件>        OpenAPI 3.x / Swagger 2.0 规范文件（JSON，或 YAML 需 pyyaml）
+  --spec-url <URL>     远端规范地址，自动下载后解析
+  --manual <文件>      手写端点清单（无需 OpenAPI，见 SKILL.md「手动清单格式」）
+
+输出:
+  --out <目录>         输出目录（生成新仓库时必填）
+  --mode mcp|skill     产出形态，默认 mcp
+                         mcp   = Node + TypeScript，stdio MCP server
+                         skill = WorkBuddy skill 包（SKILL.md + Python 零依赖脚本）
+  --pkg <包名>         生成的 package.json name / skill 目录名，默认由标题推导
+
+可选:
+  --install            生成后执行 npm install
+  --self-check         生成后做 stdio 握手自检（隐含需要 --install）
+  --audit              生成后跑质量门禁（合规/安全/可用性三栏）
+  --base-url <URL>     覆盖规范里的 servers[0].url
+  --auth-env <NAME>    鉴权密钥所在环境变量名
+  --auth-header <H>    鉴权头名称，如 X-API-Key
+  --auth-template <T>  鉴权头取值模板，如 "Bearer \${TOKEN}"
+  --force              输出目录非空时允许覆盖
+  -h, --help           显示本帮助
+`;
+
 const args = parseArgs(process.argv);
+
+if (args.help || args.h || args["?"]) {
+  console.log(USAGE);
+  process.exit(0);
+}
 
 // 支持 `--audit <目录>` 直接把目录当作审计目标（解析器会把目录当成 --audit 的值）
 if (typeof args.audit === "string" && !args.out) {
@@ -146,6 +183,9 @@ function resolveRef(spec, node) {
 // ---------------------------------------------------------------------------
 function sanitizeToolName(s, used) {
   let n = String(s)
+    // camelCase / PascalCase 先分词，避免 operationId 被压成 getpetbyid
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
@@ -689,8 +729,29 @@ function handshakeProbe(outDir) {
     }
   );
   const raw = (proc.stdout || "") + (proc.stderr || "");
-  const names = (raw.match(/"name"\s*:\s*"([^"]+)"/g) || []).map((s) => s.match(/"([^"]+)"/)[1]);
-  return { ok: names.length > 0 && /tools\/list|"tools"/.test(raw), names, raw };
+  // 逐行解析 JSON-RPC 响应，取 id=2 的 tools/list 结果。
+  // 不要用 /"name"\s*:\s*"..." 之类的正则——那会抓到对象键名（永远是 "name"）。
+  let names = [];
+  let sawToolsList = false;
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t.startsWith("{")) continue;
+    try {
+      const msg = JSON.parse(t);
+      if (msg && msg.id === 2 && msg.result && Array.isArray(msg.result.tools)) {
+        sawToolsList = true;
+        names = msg.result.tools.map((x) => x && x.name).filter(Boolean);
+      }
+    } catch (e) {
+      // 非 JSON 行（日志/警告）忽略
+    }
+  }
+  if (!sawToolsList) {
+    // 兜底：至少确认有 tools 数组出现
+    const m = raw.match(/"tools"\s*:\s*\[/);
+    if (m) sawToolsList = true;
+  }
+  return { ok: sawToolsList, names, raw };
 }
 
 // ---------------------------------------------------------------------------

@@ -14,8 +14,16 @@
 
 ## [Unreleased]
 
-- **补齐发布基建（对标 mcp-config-wizard）**：新增 `skill.manifest.json`、`CHANGELOG.md`、根目录 `README.md`、根目录 `.gitignore`、`scripts/publish.js`（GitHub 版，版本一致性校验 + 暂存打包 + changelog 提取，不依赖 skillhub CLI）；SKILL.md frontmatter 加 `version/slug/author/license`。
-- **修复手动清单模式的类型忠实缺陷**：`--manual` 的 `queryParams`/`pathParams` 现在支持对象形式 `{name,type,enum,description,required}`，让整数/布尔/枚举参数生成正确的 `z.coerce.number()` / `z.coerce.boolean()` / `z.enum`，不再一律 `z.string()`。字符串简写仍向后兼容。
+## [1.1.0] — 2026-11-02
+
+发布前回归压测（4 条主路径 × 真实 API）中挖出的问题，全部修掉并复验：
+
+- **新增 `--help` / `-h`**：此前只敲 `--help` 会被当成"缺少输入参数"直接报错。现在输出完整用法（三路输入、两种产出、全部选项）。修 OpenAPI 与修 skill 的入口都是这条命令，属于公开发布的必备项。
+- **修复握手自检把键名当工具名**：`handshakeProbe` 用正则 `/"name"\s*:\s*"([^"]+)"/g` 抓取，命中的始终是 JSON 的键 `"name"`，导致 `--self-check` 与 `--audit` 永远打印 `name, name, name...`（工具数也对不上）。改为逐行解析 JSON-RPC，取 `id=2` 的 `result.tools[].name`，现在能正确输出 `find_pets_by_status, get_pet_by_id, ...`。
+- **修复工具名丢失驼峰分词**：`sanitizeToolName` 先 `toLowerCase()` 再替换非法字符，`operationId: findPetsByStatus` 被压成 `findpetsbystatus`。改为先按 camelCase/PascalCase 插下划线，输出 `find_pets_by_status`，可读性与可发现性明显改善。
+- **修复生成的 skill 脚本在 Windows Git Bash 下 URL 拼错**：Git Bash 会把 `--endpoint /pet/1` 改写成 `C:/Program Files/Git/pet/1`，而 `urljoin` 把 `C:` 当成 scheme，最终请求到 `C:/Users/.../PortableGit/pet/1` 并报 `unknown url type: c`。新增 `demangle_windows_path()` 还原 Git 安装根目录前缀，带不带前导斜杠现在都能正确请求。
+- **修复 `skill.manifest.json` 的 `exclude_paths` 排除了 `templates/`**：生成器运行时必须读取 `templates/`，若技能中心按此清单打包，发布出去的技能将无法生成任何东西。已移除该条目。
+- **新增 `examples/`**：`petstore.json`（精简 OpenAPI 3.0，刻意覆盖 enum / integer / path 参数 / JSON body / DELETE）+ `README.md` 两分钟跑通指南。此前新用户 clone 下来没有任何可直接运行的样例。
 
 ## [1.0.0] — 2026-11-02
 
@@ -28,6 +36,8 @@
 - **质量门禁 `--audit`**：按「合规 / 安全 / 可用」三栏做可执行的静态扫描 + 运行时握手检查，给出 ✅/⚠️/❌ 报告与 FAIL/WARN/PASS 计数。
 - **自检 `--install --self-check`**：MCP 模式 = `npm install` + `tsc` 编译 + 握手；skill 模式 = `python query_api.py --help` 冒烟。
 - **类型忠实映射**：依据 OpenAPI `schema.type` 生成 `z.coerce.number()` / `z.coerce.boolean()` / `z.array(z.string())` / `z.enum`。
+- **手动清单支持类型声明**：`--manual` 的 `queryParams`/`pathParams` 支持对象形式 `{name,type,enum,description,required}`，整数/布尔/枚举参数不再一律退化成 `z.string()`；字符串简写保持向后兼容。
+- **发布基建（对标 mcp-config-wizard）**：`skill.manifest.json`、`CHANGELOG.md`、根目录 `README.md`、根目录 `.gitignore`、`scripts/publish.js`（GitHub 版：版本一致性校验 + 暂存打包 + changelog 提取，不依赖 skillhub CLI）；SKILL.md frontmatter 加 `version/slug/author/license`。
 - **功能评估方法论**（借鉴 cn-mcp-builder）：10 个只读评估问题模板 `references/evaluation_questions.xml.example`，可借其 `evaluation.py` harness 跑。
 - 对应 GitHub tag：`v1.0.0`。
 - 对应技能中心版本：`1.0.0`（发布时填写）。

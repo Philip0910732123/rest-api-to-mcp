@@ -47,10 +47,33 @@ def parse_headers(items):
     return headers
 
 
+# Git Bash / MSYS rewrites a leading-slash argument: "/pet/1" arrives here as
+# "C:/Program Files/Git/pet/1". Recover the endpoint the caller meant.
+GIT_ROOT_SEGMENTS = ("PortableGit", "Git Bash", "Git", "mingw64")
+
+
+def demangle_windows_path(endpoint):
+    """Return the POSIX-style endpoint hidden in a Windows path, else None."""
+    p = endpoint.replace("\\", "/")
+    if not (len(p) > 2 and p[1] == ":" and p[0].isalpha()):
+        return None
+    for seg in GIT_ROOT_SEGMENTS:
+        marker = "/" + seg + "/"
+        idx = p.find(marker)
+        if idx != -1:
+            rest = p[idx + len(marker) - 1:]
+            return rest if rest.startswith("/") else "/" + rest
+    tail = p[2:]
+    return tail if tail.startswith("/") else "/" + tail
+
+
 def normalize_endpoint(endpoint):
     endpoint = endpoint.strip()
     if endpoint.startswith("http://") or endpoint.startswith("https://"):
         return endpoint
+    demangled = demangle_windows_path(endpoint)
+    if demangled is not None:
+        endpoint = demangled
     if not endpoint.startswith("/"):
         endpoint = "/" + endpoint
     return endpoint
