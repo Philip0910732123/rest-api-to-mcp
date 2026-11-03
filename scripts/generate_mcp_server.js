@@ -503,6 +503,13 @@ function writeRepo(data) {
     BASE_URL: baseUrl,
     OUT_ABS: outDir,
     AUTH_ENV: auth.env || "API_KEY",
+    // 无鉴权 API 不应输出误导性的 API_KEY 占位；有鉴权时按 JSON / dotenv 两种格式分别渲染。
+    AUTH_ENV_LINE_JSON: auth.kind && auth.kind !== "none"
+      ? '        "' + (auth.env || "API_KEY") + '": "YOUR_KEY_HERE",\n'
+      : "",
+    AUTH_ENV_LINE_ENV: auth.kind && auth.kind !== "none"
+      ? (auth.env || "API_KEY") + '="YOUR_KEY_HERE"\n'
+      : "",
     AUTH_HEADER_LINES: authHeaderLines(auth),
     AUTH_QUERY_LINE: authQueryLine(auth),
     TOOL_REGISTRATIONS: toolRegs,
@@ -676,14 +683,57 @@ function runSkillSelfCheck(outDir, data) {
 // ---------------------------------------------------------------------------
 // 安装 + 编译 + 握手自检（MCP 模式）
 // ---------------------------------------------------------------------------
+function readInstalledVersion(dir, name) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, "node_modules", ...name.split("/"), "package.json"), "utf8")).version;
+  } catch { return null; }
+}
+
+function cmpVer(a, b) {
+  const pa = String(a).split(/[.-]/), pb = String(b).split(/[.-]/);
+  for (let i = 0; i < 3; i++) {
+    const d = (parseInt(pa[i], 10) || 0) - (parseInt(pb[i], 10) || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+// 只判定 ^a.b.c / ~a.b.c / 精确版本这三种常见写法；复杂范围（>=、||、*）交给 npm，不误判。
+function dependencyDrift(dir) {
+  const out = [];
+  let pj;
+  try { pj = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); } catch { return out; }
+  for (const [name, range] of Object.entries(pj.dependencies || {})) {
+    const installed = readInstalledVersion(dir, name);
+    if (!installed) { out.push(name + " 未安装"); continue; }
+    const m = String(range).trim().match(/^([\^~]?)(\d+\.\d+\.\d+)$/);
+    if (!m) continue;
+    const op = m[1], base = m[2];
+    const [bmaj, bmin] = base.split(".").map(Number);
+    const [imaj, imin] = installed.split(".").map(Number);
+    let ok;
+    if (op === "^") ok = cmpVer(installed, base) >= 0 && (bmaj > 0 ? imaj === bmaj : imin === bmin);
+    else if (op === "~") ok = cmpVer(installed, base) >= 0 && imaj === bmaj && imin === bmin;
+    else ok = installed === base;
+    if (!ok) out.push(name + " 需 " + range + "，实为 " + installed);
+  }
+  return out;
+}
+
 function runInstallAndCheck(outDir) {
   const hasNodeModules = fs.existsSync(path.join(outDir, "node_modules"));
   console.log("\n=== npm install ===");
   let inst;
-  if (hasNodeModules) {
-    console.log("（node_modules 已存在，跳过 install，直接复用）");
+  // 复用 node_modules 的前提是"版本仍对得上"。重新生成到已有目录时 package.json 可能已升级依赖
+  // （如 zod 3→4），盲目跳过会留下 package.json 说 4、实际跑 3 的错配，且从输出上看不出来。
+  const drifted = hasNodeModules ? dependencyDrift(outDir) : [];
+  if (hasNodeModules && !drifted.length) {
+    console.log("（node_modules 已存在且版本匹配，跳过 install，直接复用）");
     inst = { status: 0 };
   } else {
+    if (drifted.length) {
+      console.log("⚠️ 依赖版本与 package.json 不一致，重新安装以对齐：" + drifted.join("; "));
+    }
     for (let attempt = 1; attempt <= 3; attempt++) {
       // 用 shell:true 让系统 shell 解析 npm(.cmd)，退出码才能正确传播（Windows 直调 .cmd 会丢退出码）
       inst = spawnSync("npm", ["install"], { cwd: outDir, stdio: "inherit", shell: true });
@@ -814,6 +864,15 @@ function runAudit(outDir) {
   if (secretPatterns.some((p) => p.test(src)))
     fail("安全", "无硬编码密钥/凭证", "检测到疑似硬编码密钥，请改为环境变量");
   else pass("安全", "无硬编码密钥/凭证", "源码与配置中未发现疑似硬编码密钥");
+
+  // 生成的包常被打 zip 分发：示例配置里若带生成机绝对路径，换机即失效，还会泄露用户名/目录结构。
+  if (has.cfg) {
+    const cfgTxt = read("cfg");
+    // 盘符前必须是分隔符/引号，否则 https:// 里的 "s:/" 会被误判为盘符路径
+    if (/(^|[^A-Za-z0-9])[A-Za-z]:[\\/]/.test(cfgTxt) || /\/(Users|home)\//.test(cfgTxt))
+      fail("安全", "示例配置不含本机绝对路径", "mcp_config.example.json 含绝对路径，分发后必然失效并泄露本机目录");
+    else pass("安全", "示例配置不含本机绝对路径", "示例配置使用占位路径，可安全打包分发");
+  }
 
   if (has.tools) {
     const t = read("tools");

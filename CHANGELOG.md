@@ -14,6 +14,16 @@
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-03
+
+起因：把生成的 `quickgo-mcp` 打成 zip 分发给他人，在「另一台机器 + `mcp-config-wizard --from-zip`」的模拟环境里实测出的问题。都不是自测能撞到的，只有真的把包交出去才会暴露：
+
+- **修复示例配置写入生成机绝对路径**：`mcp_config.example.json` 的 `args` 用 `{{OUT_ABS}}` 渲染，产出形如 `C:\Users\<user>\...\build\index.js`。打包分发后这个路径在别人机器上不存在（示例直接失效），同时泄露本机用户名与目录结构。改为占位 `/ABSOLUTE/PATH/TO/<pkg>/build/index.js`，并在 README 说明需替换。
+- **无鉴权 API 不再输出误导性 `API_KEY`**：此前无论是否有鉴权，`.env.example` 与示例配置都会写 `API_KEY="YOUR_KEY_HERE"`，让 QuickGO 这类公开 API 的使用者以为要申请密钥。现在按 `auth.kind` 决定是否渲染该行。
+- **新增审计项「示例配置不含本机绝对路径」**：`--audit` 静态扫描 `mcp_config.example.json`，命中盘符路径或 `/Users/`、`/home/` 即 FAIL。正反向均已验证（`https://` 中的 `s:/` 已排除，不误报）。
+- **依赖基线抬到 `@modelcontextprotocol/sdk ^1.32.2` + `zod ^4.6.7`**：`zod < 4.6.6` 存在 GHSA-mrhx-c7xc-m3w5（校验超大受限集合时内存耗尽，high），且 zod 3 无补丁版本，只能升 4。已实测 `tsc` 通过、握手通过、真实调用通过、`z.enum` 合法值放行/非法值拦截正常；生成包的 `npm install` 从「1 high severity」变为「0 vulnerabilities」。
+- **修复 `--install` 盲目复用旧 `node_modules`**：重新生成到已有目录时，若 `node_modules` 已存在就跳过安装，导致 `package.json` 写 `zod ^4.6.7`、实际仍跑 3.25.76，且从输出上看不出来。现在先比对声明的依赖范围与已安装版本（支持 `^`/`~`/精确版本），漂移则重装并打印具体差异。
+
 ## [1.1.0] — 2026-11-02
 
 发布前回归压测（4 条主路径 × 真实 API）中挖出的问题，全部修掉并复验：

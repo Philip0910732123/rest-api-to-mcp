@@ -2,7 +2,7 @@
 name: rest-api-to-mcp
 description: 把任意 REST API（OpenAPI 3.x 规范或手动端点清单）生成一个「可直接发布到 GitHub」的 MCP server 仓库（stdio 传输，Node + TypeScript），或一个 WorkBuddy skill 包（Python 零依赖，对标 ucsc-genome-api 那种「SKILL.md + 脚本」封装）。当用户想把某个 Web API / SaaS 接口封装成 AI 可调用的 MCP 工具或 skill、或要"从 OpenAPI 造一个 MCP/skill"时触发。
 slug: rest-api-to-mcp
-version: 1.1.0
+version: 1.1.1
 author: hupan
 license: MIT
 ---
